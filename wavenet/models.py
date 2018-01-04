@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from layers import (_causal_linear, _output_linear, conv1d,
+from wavenet.layers import (_causal_linear, _output_linear, conv1d,
                     dilated_conv1d)
-
+import logging
+import sys
 
 class Model(object):
     def __init__(self,
@@ -44,7 +45,7 @@ class Model(object):
                          bias=True)
 
         costs = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            outputs, targets)
+            logits=outputs, labels=targets)
         cost = tf.reduce_mean(costs)
 
         train_step = tf.train.AdamOptimizer(learning_rate=0.001).minimize(cost)
@@ -70,20 +71,22 @@ class Model(object):
             feed_dict=feed_dict)
         return cost
 
-    def train(self, inputs, targets):
+    def train(self, dataloader, epochs=10):
         losses = []
-        terminal = False
-        i = 0
-        while not terminal:
-            i += 1
-            cost = self._train(inputs, targets)
-            if cost < 1e-1:
-                terminal = True
-            losses.append(cost)
-            if i % 50 == 0:
-                plt.plot(losses)
-                plt.show()
+        for epoch in range(epochs):
+            for idx, (inputs, targets) in enumerate(dataloader):
+                cost = self._train(inputs.numpy(), targets.numpy())
+                losses.append(cost)
+                if idx % 50 == 0:
+                    print("%d/%d" %(idx, len(dataloader)))
 
+            print(idx, np.mean(losses))
+            plt.cla()
+            plt.plot(losses)
+            plt.show(False)
+            plt.pause(1e-6)
+
+            print("Epoch: %f; loss: %f" %(epoch, np.mean(losses)))
 
 class Generator(object):
     def __init__(self, model, batch_size=1, input_size=1):
